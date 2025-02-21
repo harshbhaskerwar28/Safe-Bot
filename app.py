@@ -101,7 +101,7 @@ class SafetyResponseSystem:
     def __init__(self):
         self.llm = ChatGroq(
             temperature=0.3,
-            model_name="llama-3.1-70b-versatile",
+            model_name="llama-guard-3-8b",
             groq_api_key=os.getenv("GROQ_API_KEY")
         )
         self.chat_history = []
