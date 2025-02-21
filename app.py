@@ -244,6 +244,84 @@ def setup_streamlit_ui():
         }
         </style>
     """, unsafe_allow_html=True)
+
+
+class AgentStatus:
+    """Safety agent status management with sidebar display"""
+    def __init__(self):
+        self.sidebar_placeholder = None
+        self.agents = {
+            'medical_response': {'status': 'idle', 'progress': 0, 'message': ''},
+            'personal_safety': {'status': 'idle', 'progress': 0, 'message': ''},
+            'disaster_response': {'status': 'idle', 'progress': 0, 'message': ''},
+            'women_safety': {'status': 'idle', 'progress': 0, 'message': ''}
+        }
+        
+    def initialize_sidebar_placeholder(self):
+        with st.sidebar:
+            self.sidebar_placeholder = st.empty()
+    
+    def update_status(self, agent_name: str, status: str, progress: float, message: str = ""):
+        self.agents[agent_name] = {
+            'status': status,
+            'progress': progress,
+            'message': message
+        }
+        self._render_status()
+
+    def _render_status(self):
+        if self.sidebar_placeholder is None:
+            self.initialize_sidebar_placeholder()
+            
+        with self.sidebar_placeholder.container():
+            for agent_name, status in self.agents.items():
+                self._render_agent_card(agent_name, status)
+
+    def _render_agent_card(self, agent_name: str, status: dict):
+        colors = {
+            'idle': '#6c757d',
+            'working': '#28a745',
+            'completed': '#17a2b8',
+            'error': '#dc3545'
+        }
+        color = colors.get(status['status'], colors['idle'])
+        
+        st.markdown(f"""
+            <div style="
+                background-color: #1E1E1E;
+                padding: 0.8rem;
+                border-radius: 0.5rem;
+                margin-bottom: 0.8rem;
+                border: 1px solid {color};
+            ">
+                <div style="color: {color}; font-weight: bold;">
+                    {agent_name.replace('_', ' ').title()}
+                </div>
+                <div style="
+                    color: #FFFFFF;
+                    font-size: 0.8rem;
+                    margin: 0.3rem 0;
+                ">
+                    {status['message'] or status['status'].title()}
+                </div>
+                <div style="
+                    height: 4px;
+                    background-color: rgba(255,255,255,0.1);
+                    border-radius: 2px;
+                    margin-top: 0.5rem;
+                ">
+                    <div style="
+                        width: {status['progress'] * 100}%;
+                        height: 100%;
+                        background-color: {color};
+                        border-radius: 2px;
+                        transition: width 0.3s ease;
+                    "></div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+
 class SafetyResponseSystem:
     """Emergency response system with specialized safety agents"""
     def __init__(self):
