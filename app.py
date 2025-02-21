@@ -1,7 +1,7 @@
 import os
 import asyncio
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Optional
 import streamlit as st
 from langchain_groq import ChatGroq
 from langchain.schema import AIMessage, HumanMessage
@@ -13,763 +13,434 @@ import time
 load_dotenv()
 
 @dataclass
-class AgentResponse:
-    """Structure for storing safety agent responses"""
-    agent_name: str
-    content: str
-    confidence: float
-    metadata: Dict = None
-    processing_time: float = 0.0
+class SafetyResponse:
+    """Structure for storing comprehensive safety responses"""
+    category: str
+    immediate_actions: List[str]
+    detailed_steps: List[str]
+    precautions: List[str]
+    emergency_contacts: Dict[str, str]
+    followup_care: List[str]
+    additional_resources: Dict[str, str]
+    confidence_score: float
+    response_time: float
 
-class SafetyResponseSystem:
-    """Enhanced emergency response system with specialized safety agents for Indian context"""
+class IndianEmergencySystem:
+    """Enhanced emergency response system for Indian context"""
+    
     def __init__(self):
         self.llm = ChatGroq(
             temperature=0.3,
-            model_name="llama-guard-3-8b",
+            model_name="mixtral-8x7b-32768",  # Using a more capable model
             groq_api_key=os.getenv("GROQ_API_KEY")
         )
         self.chat_history = []
-        self._initialize_prompts()
-        self.agents = self._initialize_agents()
+        self.emergency_contacts = {
+            "Police": "100",
+            "Ambulance": "108",
+            "Women Helpline": "1091",
+            "Child Helpline": "1098",
+            "National Emergency": "112",
+            "Fire": "101",
+            "Disaster Management": "1070"
+        }
+        self._initialize_agents()
 
-    def _initialize_prompts(self):
-        """Initialize specialized safety agent prompts with detailed Indian context"""
-        self.prompts = {
-            'medical_response': """You are an Emergency Medical Response AI specialized for Indian healthcare context.
-Given Query: {query}
-Chat History: {chat_history}
+    def _initialize_agents(self):
+        """Initialize specialized emergency response agents"""
+        self.agents = {
+            "medical": self._create_medical_agent(),
+            "personal_safety": self._create_safety_agent(),
+            "disaster": self._create_disaster_agent(),
+            "women_safety": self._create_women_safety_agent()
+        }
 
-Provide detailed medical guidance following this structure:
-1. IMMEDIATE ACTIONS (First 5 minutes):
-   - List critical steps
-   - Mention specific emergency numbers (102/108/112)
-   - Local medical facility guidance
+    def _create_medical_agent(self):
+        prompt = """You are an Indian Emergency Medical Response Expert.
+Current Situation: {query}
+Previous Context: {chat_history}
 
-2. FIRST AID STEPS:
-   - Clear step-by-step instructions
-   - Common mistakes to avoid
-   - Available local alternatives
+Provide a detailed medical emergency response following this exact structure:
 
-3. PROFESSIONAL MEDICAL HELP:
-   - When to call emergency services
-   - What to tell emergency operators
-   - Required medical documents/information
+🚨 IMMEDIATE ACTIONS (First 5 minutes):
+- List specific life-saving steps
+- Include local emergency numbers (108/112)
+- Nearest hospital guidance
 
-4. FOLLOW-UP CARE:
-   - Recovery monitoring
-   - Warning signs to watch
-   - Prevention tips
+🏥 DETAILED MEDICAL STEPS:
+- Step-by-step first aid instructions
+- Common mistakes to avoid
+- Local alternatives if modern equipment unavailable
 
-Focus on practical steps suitable for Indian conditions. Include alternative approaches when modern facilities aren't immediately available.""",
+⚕️ MEDICAL PRECAUTIONS:
+- What NOT to do
+- Warning signs to watch
+- When to call for emergency help
 
-            'personal_safety': """You are a Personal Safety Response AI for Indian context.
-Given Query: {query}
-Chat History: {chat_history}
+📞 EMERGENCY CONTACTS:
+- Local ambulance services
+- Poison control centers
+- Blood banks
 
-Provide comprehensive safety guidance:
-1. IMMEDIATE SAFETY STEPS:
-   - Quick escape routes
-   - Emergency contacts (100/112)
-   - Local police station contact
+🔄 FOLLOW-UP CARE:
+- Recovery monitoring steps
+- Required medical documentation
+- Prevention measures
 
-2. DEFENSIVE MEASURES:
-   - De-escalation techniques
-   - Self-defense basics
-   - Using nearby resources
+Ensure all guidance is practical for Indian conditions and resources.
+Include specific instructions for both urban and rural settings.
+Focus on immediate life-saving actions first."""
 
-3. GETTING HELP:
-   - Alerting authorities
-   - Contacting family/friends
-   - Legal rights and options
+        return self._create_agent(prompt)
 
-4. FUTURE PREVENTION:
-   - Safety planning
-   - Avoiding similar situations
-   - Community resources
+    def _create_safety_agent(self):
+        prompt = """You are an Indian Personal Safety Expert.
+Current Situation: {query}
+Previous Context: {chat_history}
 
-Include specific Indian laws and helpline numbers. Consider both urban and rural contexts.""",
+Provide comprehensive safety guidance following this structure:
 
-            'disaster_response': """You are a Disaster Response AI for Indian emergencies.
-Given Query: {query}
-Chat History: {chat_history}
+🚨 IMMEDIATE SAFETY ACTIONS:
+- Escape/protection steps
+- Emergency numbers (100/112)
+- Local police contact
 
-Provide location-specific disaster guidance:
-1. IMMEDIATE RESPONSE:
-   - Evacuation steps
-   - Emergency kit items
-   - Safe zones identification
+🛡️ DETAILED SAFETY STEPS:
+- Step-by-step protection measures
+- De-escalation techniques
+- Self-defense basics
 
-2. COMMUNICATION PLAN:
-   - Emergency numbers (112/1070)
-   - Family coordination
-   - Local authority contact
+⚠️ SAFETY PRECAUTIONS:
+- Situation assessment
+- Risk mitigation
+- Prevention strategies
 
-3. SURVIVAL STEPS:
-   - Basic needs securing
-   - Resource management
-   - Group safety measures
+📞 EMERGENCY CONTACTS:
+- Local police stations
+- Community helplines
+- Support organizations
 
-4. RECOVERY GUIDANCE:
-   - Post-disaster assessment
-   - Government helplines
-   - Relief camp locations
+🔄 FOLLOW-UP MEASURES:
+- Documentation needed
+- Legal options
+- Support resources
 
-Consider monsoon, earthquake, and flood scenarios common in India.""",
+Include specific Indian laws and regulations.
+Consider both urban and rural contexts.
+Focus on practical, implementable steps."""
 
-            'women_safety': """You are a Women's Safety Response AI for Indian context.
-Given Query: {query}
-Chat History: {chat_history}
+        return self._create_agent(prompt)
+
+    def _create_disaster_agent(self):
+        prompt = """You are an Indian Disaster Management Expert.
+Current Situation: {query}
+Previous Context: {chat_history}
+
+Provide detailed disaster response guidance:
+
+🚨 IMMEDIATE ACTIONS:
+- Evacuation steps
+- Safety zones
+- Emergency kit items
+
+🏘️ DETAILED RESPONSE STEPS:
+- Location-specific measures
+- Resource management
+- Group coordination
+
+⚠️ SAFETY PRECAUTIONS:
+- Area assessment
+- Risk identification
+- Preventive measures
+
+📞 EMERGENCY CONTACTS:
+- Disaster helpline (1070)
+- Relief organizations
+- Local authorities
+
+🔄 RECOVERY GUIDANCE:
+- Post-disaster assessment
+- Relief camp locations
+- Government assistance
+
+Consider monsoon, earthquake, and flood scenarios.
+Include both urban and rural contexts.
+Focus on Indian disaster response protocols."""
+
+        return self._create_agent(prompt)
+
+    def _create_women_safety_agent(self):
+        prompt = """You are an Indian Women's Safety Expert.
+Current Situation: {query}
+Previous Context: {chat_history}
 
 Provide women-specific safety guidance:
-1. IMMEDIATE SAFETY:
-   - Emergency steps
-   - Women helpline (1091)
-   - Safe escape tactics
 
-2. LEGAL RIGHTS:
-   - Immediate legal options
-   - Police assistance (100)
-   - Documentation needs
+🚨 IMMEDIATE ACTIONS:
+- Safety steps
+- Emergency numbers (1091/112)
+- Safe escape tactics
 
-3. SUPPORT RESOURCES:
-   - NGO helplines
-   - Support groups
-   - Safe shelter locations
+👩 DETAILED SAFETY STEPS:
+- Protection measures
+- Documentation needs
+- Support resources
 
-4. PREVENTIVE MEASURES:
-   - Safety apps/tools
-   - Self-defense techniques
-   - Community support
+⚠️ SAFETY PRECAUTIONS:
+- Situation assessment
+- Risk mitigation
+- Prevention strategies
 
-Include specific Indian laws protecting women and local support organizations."""
-        }
+📞 EMERGENCY CONTACTS:
+- Women helpline
+- NGO support
+- Legal aid
 
-    def _initialize_agents(self):
-        return {
-            name: ChatPromptTemplate.from_messages([
-                ("system", prompt),
-                ("human", "{input}")
-            ]) | self.llm | StrOutputParser()
-            for name, prompt in self.prompts.items()
-        }
+🔄 FOLLOW-UP MEASURES:
+- Legal documentation
+- Support groups
+- Counseling services
 
-    async def _synthesize_safety_responses(
-        self,
-        query: str,
-        chat_history: str,
-        responses: Dict[str, AgentResponse]
-    ) -> AgentResponse:
-        synthesis_template = """
-        Based on the emergency assessments, provide a comprehensive response:
+Include specific Indian women protection laws.
+Reference local women support organizations.
+Focus on practical, immediate safety."""
 
-        🚨 IMMEDIATE PRIORITY ACTIONS:
-        {immediate_steps}
+        return self._create_agent(prompt)
 
-        🛡️ SAFETY MEASURES:
-        {safety_steps}
+    def _create_agent(self, prompt):
+        return ChatPromptTemplate.from_messages([
+            ("system", prompt),
+            ("human", "{input}")
+        ]) | self.llm | StrOutputParser()
 
-        🏥 EMERGENCY CONTACTS:
-        - Police: 100
-        - Ambulance: 102/108
-        - National Emergency: 112
-        - Women Helpline: 1091
-        - Disaster Management: 1070
-        
-        📋 DETAILED GUIDANCE:
-        {detailed_steps}
-
-        ⚠️ IMPORTANT WARNINGS:
-        {warnings}
-
-        Prioritize immediate life-saving actions and clear, practical steps.
-        """
-        
-        # Rest of the implementation remains similar but with enhanced response formatting
-        # ... [Previous implementation details]
-
-def setup_streamlit_ui():
-    st.set_page_config(
-        page_title="Indian Emergency Safety Response System",
-        page_icon="🚨",
-        layout="wide"
-    )
-    
-    st.markdown("""
-        <style>
-        .stApp {
-            background-color: #1E1E1E;
-            color: #ffffff;
-        }
-        
-        .emergency-card {
-            background-color: #2D2D2D;
-            border-radius: 10px;
-            padding: 20px;
-            margin: 10px 0;
-            border-left: 5px solid #DC3545;
-        }
-        
-        .priority-action {
-            background-color: #DC3545;
-            color: white;
-            padding: 10px;
-            border-radius: 5px;
-            margin: 5px 0;
-        }
-        
-        .safety-step {
-            background-color: #28A745;
-            color: white;
-            padding: 10px;
-            border-radius: 5px;
-            margin: 5px 0;
-        }
-        
-        .warning-box {
-            background-color: #FFC107;
-            color: black;
-            padding: 10px;
-            border-radius: 5px;
-            margin: 5px 0;
-        }
-        
-        .contact-number {
-            background-color: #17A2B8;
-            color: white;
-            padding: 10px;
-            border-radius: 5px;
-            margin: 5px 0;
-            display: inline-block;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
-
-class AgentStatus:
-    """Safety agent status management with sidebar display"""
-    def __init__(self):
-        self.sidebar_placeholder = None
-        self.agents = {
-            'medical_response': {'status': 'idle', 'progress': 0, 'message': ''},
-            'personal_safety': {'status': 'idle', 'progress': 0, 'message': ''},
-            'disaster_response': {'status': 'idle', 'progress': 0, 'message': ''},
-            'women_safety': {'status': 'idle', 'progress': 0, 'message': ''}
-        }
-        
-    def initialize_sidebar_placeholder(self):
-        with st.sidebar:
-            self.sidebar_placeholder = st.empty()
-    
-    def update_status(self, agent_name: str, status: str, progress: float, message: str = ""):
-        self.agents[agent_name] = {
-            'status': status,
-            'progress': progress,
-            'message': message
-        }
-        self._render_status()
-
-    def _render_status(self):
-        if self.sidebar_placeholder is None:
-            self.initialize_sidebar_placeholder()
-            
-        with self.sidebar_placeholder.container():
-            for agent_name, status in self.agents.items():
-                self._render_agent_card(agent_name, status)
-
-    def _render_agent_card(self, agent_name: str, status: dict):
-        colors = {
-            'idle': '#6c757d',
-            'working': '#28a745',
-            'completed': '#17a2b8',
-            'error': '#dc3545'
-        }
-        color = colors.get(status['status'], colors['idle'])
-        
-        st.markdown(f"""
-            <div style="
-                background-color: #1E1E1E;
-                padding: 0.8rem;
-                border-radius: 0.5rem;
-                margin-bottom: 0.8rem;
-                border: 1px solid {color};
-            ">
-                <div style="color: {color}; font-weight: bold;">
-                    {agent_name.replace('_', ' ').title()}
-                </div>
-                <div style="
-                    color: #FFFFFF;
-                    font-size: 0.8rem;
-                    margin: 0.3rem 0;
-                ">
-                    {status['message'] or status['status'].title()}
-                </div>
-                <div style="
-                    height: 4px;
-                    background-color: rgba(255,255,255,0.1);
-                    border-radius: 2px;
-                    margin-top: 0.5rem;
-                ">
-                    <div style="
-                        width: {status['progress'] * 100}%;
-                        height: 100%;
-                        background-color: {color};
-                        border-radius: 2px;
-                        transition: width 0.3s ease;
-                    "></div>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-
-
-class SafetyResponseSystem:
-    """Emergency response system with specialized safety agents"""
-    def __init__(self):
-        self.llm = ChatGroq(
-            temperature=0.3,
-            model_name="llama-guard-3-8b",
-            groq_api_key=os.getenv("GROQ_API_KEY")
-        )
-        self.chat_history = []
-        self._initialize_prompts()
-        self.agents = self._initialize_agents()
-
-    def _initialize_prompts(self):
-        """Initialize specialized safety agent prompts"""
-        self.prompts = {
-            'medical_response': """You are an Emergency Medical Response AI.
-Query: {query}
-Chat History: {chat_history}
-
-Provide clear, step-by-step first aid guidance:
-1. Immediate actions needed
-2. Do's and Don'ts
-3. When to seek professional help
-4. Follow-up care steps
-
-Focus on life-saving steps and clear instructions.""",
-
-            'personal_safety': """You are a Personal Safety Response AI.
-Query: {query}
-Chat History: {chat_history}
-
-Provide practical safety guidance:
-1. Immediate safety steps
-2. De-escalation techniques
-3. Emergency contact advice
-4. Prevention strategies
-
-Keep instructions clear and actionable.""",
-
-            'disaster_response': """You are a Disaster Response AI.
-Query: {query}
-Chat History: {chat_history}
-
-Provide emergency response guidance:
-1. Immediate safety measures
-2. Evacuation instructions
-3. Emergency supplies needed
-4. Communication steps
-
-Prioritize life-saving actions.""",
-
-            'women_safety': """You are a Women's Safety Response AI.
-Query: {query}
-Chat History: {chat_history}
-
-Provide focused safety guidance:
-1. Immediate safety steps
-2. Support resources
-3. Legal rights and options
-4. Prevention strategies
-
-Maintain sensitivity while being practical."""
-        }
-
-    def _initialize_agents(self):
-        return {
-            name: ChatPromptTemplate.from_messages([
-                ("system", prompt),
-                ("human", "{input}")
-            ]) | self.llm | StrOutputParser()
-            for name, prompt in self.prompts.items()
-        }
-
-    def _format_chat_history(self) -> str:
-        formatted = []
-        for msg in self.chat_history[-5:]:
-            role = "User" if isinstance(msg, HumanMessage) else "Assistant"
-            formatted.append(f"{role}: {msg.content}")
-        return "\n".join(formatted)
-
-    async def process_query(
-        self,
-        query: str,
-        status_callback
-    ) -> Dict[str, AgentResponse]:
-        responses = {}
-        chat_history = self._format_chat_history()
-        
-        try:
-            agent_tasks = []
-            for agent_name in self.agents.keys():
-                status_callback(agent_name, 'working', 0.2, f"Analyzing situation")
-                agent_tasks.append(self._get_agent_response(
-                    agent_name, query, chat_history
-                ))
-
-            agent_responses = await asyncio.gather(*agent_tasks)
-            
-            for agent_name, response in zip(self.agents.keys(), agent_responses):
-                responses[agent_name] = response
-                status_callback(
-                    agent_name,
-                    'completed',
-                    1.0,
-                    f"Safety analysis complete"
-                )
-
-            final_response = await self._synthesize_safety_responses(
-                query, chat_history, responses
-            )
-            responses['final_analysis'] = final_response
-
-            self.chat_history.extend([
-                HumanMessage(content=query),
-                AIMessage(content=final_response.content)
-            ])
-
-            return responses
-
-        except Exception as e:
-            for agent in self.agents.keys():
-                status_callback(agent, 'error', 0, str(e))
-            raise Exception(f"Safety analysis error: {str(e)}")
-
-    async def _get_agent_response(
-        self,
-        agent_name: str,
-        query: str,
-        chat_history: str
-    ) -> AgentResponse:
+    async def get_emergency_response(self, query: str) -> SafetyResponse:
+        """Process emergency query and return comprehensive response"""
         start_time = time.time()
         
+        # Determine emergency type and get relevant responses
+        responses = await self._get_agent_responses(query)
+        
+        # Synthesize final response
+        final_response = await self._create_final_response(responses, query)
+        
+        processing_time = time.time() - start_time
+        
+        return SafetyResponse(
+            category=self._determine_emergency_type(query),
+            immediate_actions=final_response["immediate_actions"],
+            detailed_steps=final_response["detailed_steps"],
+            precautions=final_response["precautions"],
+            emergency_contacts=self.emergency_contacts,
+            followup_care=final_response["followup"],
+            additional_resources=final_response["resources"],
+            confidence_score=final_response["confidence"],
+            response_time=processing_time
+        )
+
+    async def _get_agent_responses(self, query: str) -> Dict[str, str]:
+        """Get responses from all relevant agents"""
+        tasks = []
+        for agent_name, agent in self.agents.items():
+            tasks.append(self._get_single_agent_response(agent_name, agent, query))
+        
+        responses = await asyncio.gather(*tasks)
+        return dict(responses)
+
+    async def _get_single_agent_response(self, name: str, agent, query: str):
+        """Get response from a single agent"""
         try:
-            response = await self.agents[agent_name].ainvoke({
+            response = await agent.ainvoke({
                 "input": query,
                 "query": query,
-                "chat_history": chat_history
+                "chat_history": self._format_chat_history()
             })
-            
-            processing_time = time.time() - start_time
-            
-            metadata = {
-                "processing_time": processing_time,
-                "query_length": len(query),
-                "response_confidence": self._calculate_confidence(response)
-            }
-            
-            return AgentResponse(
-                agent_name=agent_name,
-                content=response,
-                confidence=self._calculate_confidence(response),
-                metadata=metadata,
-                processing_time=processing_time
-            )
-            
+            return (name, response)
         except Exception as e:
-            raise Exception(f"Safety agent {agent_name} error: {str(e)}")
+            return (name, f"Error in {name}: {str(e)}")
 
-    def _calculate_confidence(self, response: str) -> float:
-        confidence = 0.7
-        
-        key_indicators = [
-            "immediately", "urgent", "emergency", "call 911",
-            "seek help", "safety", "caution", "warning"
-        ]
-        
-        for indicator in key_indicators:
-            if indicator.lower() in response.lower():
-                confidence += 0.03
-                
-        return min(0.95, confidence)
+    def _determine_emergency_type(self, query: str) -> str:
+        """Determine the primary type of emergency from the query"""
+        # Add logic to categorize emergency type
+        return "general"
 
-    async def _synthesize_safety_responses(
-        self,
-        query: str,
-        chat_history: str,
-        responses: Dict[str, AgentResponse]
-    ) -> AgentResponse:
+    def _format_chat_history(self) -> str:
+        """Format recent chat history"""
+        history = []
+        for msg in self.chat_history[-5:]:
+            role = "User" if isinstance(msg, HumanMessage) else "Assistant"
+            history.append(f"{role}: {msg.content}")
+        return "\n".join(history)
+
+    async def _create_final_response(self, responses: Dict[str, str], query: str) -> Dict:
+        """Create final synthesized response"""
+        synthesis_prompt = """
+        Analyze these emergency responses and create a comprehensive safety guide:
+
+        Original Query: {query}
+
+        Agent Responses:
+        {responses}
+
+        Create a structured response with:
+        1. Most critical immediate actions
+        2. Detailed step-by-step guidance
+        3. Important precautions
+        4. Follow-up care steps
+        5. Additional resources and contacts
+
+        Focus on practical, actionable steps for Indian context.
+        """
+
         try:
-            greetings = ['hi', 'hello', 'hey', 'hii', 'greetings']
-            if query.lower().strip() in greetings:
-                return AgentResponse(
-                    agent_name="final_analysis",
-                    content="Hello! I'm here to help you with any emergency or safety situation. How can I assist you?",
-                    confidence=1.0,
-                    metadata={"greeting": True},
-                    processing_time=0.1
-                )
+            synthesis_chain = ChatPromptTemplate.from_messages([
+                ("system", synthesis_prompt)
+            ]) | self.llm | StrOutputParser()
 
-            formatted_responses = "\n\n".join([
-                f"{name.upper()}:\n{response.content}"
-                for name, response in responses.items()
-                if name != 'final_analysis'
-            ])
-
-            start_time = time.time()
-            
-            synthesis_template = """
-            Analyze these safety recommendations and provide:
-
-            1. IMMEDIATE ACTIONS (Most urgent steps)
-            2. KEY SAFETY POINTS (Important precautions)
-            3. WHEN TO GET HELP (Professional assistance criteria)
-            4. FOLLOW-UP STEPS (After immediate crisis)
-
-            Safety Assessments:
-            {formatted_responses}
-            
-            Provide clear, actionable steps. Prioritize life-saving measures.
-            """
-
-            synthesis_prompt = ChatPromptTemplate.from_messages([
-                ("system", synthesis_template)
-            ])
-            
-            synthesis_chain = synthesis_prompt | self.llm | StrOutputParser()
-            
-            synthesis_response = await synthesis_chain.ainvoke({
-                "formatted_responses": formatted_responses
+            synthesis = await synthesis_chain.ainvoke({
+                "query": query,
+                "responses": "\n\n".join([f"{k}:\n{v}" for k, v in responses.items()])
             })
-            
-            processing_time = time.time() - start_time
-            
-            overall_confidence = sum(
-                response.confidence for response in responses.values()
-            ) / len(responses)
-            
-            metadata = {
-                "processing_time": processing_time,
-                "source_responses": len(responses),
-                "overall_confidence": overall_confidence
-            }
-            
-            return AgentResponse(
-                agent_name="final_analysis",
-                content=synthesis_response,
-                confidence=overall_confidence,
-                metadata=metadata,
-                processing_time=processing_time
-            )
 
+            # Parse synthesis into structured format
+            return {
+                "immediate_actions": self._extract_section(synthesis, "IMMEDIATE ACTIONS"),
+                "detailed_steps": self._extract_section(synthesis, "DETAILED STEPS"),
+                "precautions": self._extract_section(synthesis, "PRECAUTIONS"),
+                "followup": self._extract_section(synthesis, "FOLLOW-UP"),
+                "resources": self._extract_resources(synthesis),
+                "confidence": 0.9  # Add confidence scoring logic
+            }
         except Exception as e:
-            raise Exception(f"Safety synthesis error: {str(e)}")
+            raise Exception(f"Response synthesis error: {str(e)}")
+
+    def _extract_section(self, text: str, section: str) -> List[str]:
+        """Extract specific section from synthesis response"""
+        # Add logic to extract and parse sections
+        return ["Sample step 1", "Sample step 2"]
+
+    def _extract_resources(self, text: str) -> Dict[str, str]:
+        """Extract additional resources from synthesis response"""
+        # Add logic to extract resources
+        return {"Resource 1": "Contact info"}
 
 def setup_streamlit_ui():
+    """Configure Streamlit UI with enhanced styling"""
     st.set_page_config(
-        page_title="Emergency Safety Response System",
+        page_title="Indian Emergency Response System",
         page_icon="🚨",
         layout="wide"
     )
-    
+
+    # Add custom CSS for better UI
     st.markdown("""
         <style>
-        .stApp {
-            background-color: #1a1a1a;
-            color: #ffffff;
-        }
-        
-        .chat-message {
-            padding: 1rem;
-            border-radius: 0.5rem;
-            margin-bottom: 1rem;
-            border: 1px solid #28a745;
-            background-color: rgba(40, 167, 69, 0.1);
-        }
-        
-        .agent-card {
-            padding: 1rem;
-            margin-bottom: 1rem;
-            border: 1px solid #28a745;
-            border-radius: 0.5rem;
-            background-color: rgba(40, 167, 69, 0.05);
-        }
-        
-        .metadata-section {
-            font-size: 0.8rem;
-            color: #28a745;
-            margin-top: 0.5rem;
-        }
-        
-        .emergency-button {
-            background-color: #dc3545;
+        .emergency-header {
+            background-color: #DC3545;
             color: white;
             padding: 1rem;
-            border-radius: 0.5rem;
+            border-radius: 10px;
             text-align: center;
-            cursor: pointer;
-            margin: 1rem 0;
+            margin-bottom: 2rem;
         }
         
-        .emergency-button:hover {
-            background-color: #c82333;
+        .response-card {
+            background-color: #F8F9FA;
+            border-left: 5px solid #28A745;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
         }
         
-        [data-testid="stSidebar"] {
-            background-color: #1a1a1a;
+        .emergency-contact {
+            background-color: #FFC107;
+            color: black;
+            padding: 0.5rem;
+            border-radius: 5px;
+            margin: 0.5rem 0;
+            display: inline-block;
+        }
+        
+        .step-card {
+            background-color: #E9ECEF;
+            padding: 1rem;
+            border-radius: 5px;
+            margin: 0.5rem 0;
         }
         </style>
     """, unsafe_allow_html=True)
 
 def main():
+    """Main application function"""
     setup_streamlit_ui()
     
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-    if "agent" not in st.session_state:
-        st.session_state.agent = SafetyResponseSystem()
-    if "agent_status" not in st.session_state:
-        st.session_state.agent_status = AgentStatus()
-    
+    # Initialize session state
+    if "emergency_system" not in st.session_state:
+        st.session_state.emergency_system = IndianEmergencySystem()
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+
+    # Application header
     st.markdown("""
-        <div style='text-align: center; color: #ffffff;'>
-            <h1>🚨 Emergency Safety Response System</h1>
+        <div class="emergency-header">
+            <h1>🚨 Indian Emergency Response System</h1>
             <p>Get immediate guidance for emergency situations</p>
         </div>
     """, unsafe_allow_html=True)
-    
-    # Sidebar with emergency resources
+
+    # Sidebar with emergency contacts
     with st.sidebar:
-        st.markdown("""
-            <div style='color: #28a745;'>
-                <h3>🏥 Emergency Resources</h3>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("""
-            <div class='emergency-button'>
-                🚑 Emergency: Call 100,108
-            </div>
-            
-            # Quick access buttons for common emergencies
-            <div style='margin-top: 2rem;'>
-                <h4>Quick Access Situations:</h4>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        if st.button("🏥 Medical Emergency"):
-            st.session_state.messages.append({
-                "role": "user",
-                "content": "What should I do in a medical emergency? Give me step by step instructions."
-            })
-        
-        if st.button("🛡️ Personal Safety"):
-            st.session_state.messages.append({
-                "role": "user",
-                "content": "I feel unsafe in my current situation. What immediate steps should I take?"
-            })
-            
-        if st.button("🌪️ Natural Disaster"):
-            st.session_state.messages.append({
-                "role": "user",
-                "content": "How should I prepare and respond to a natural disaster in my area?"
-            })
-            
-        if st.button("👩 Women's Safety"):
-            st.session_state.messages.append({
-                "role": "user",
-                "content": "What immediate steps should I take if I feel threatened or unsafe as a woman?"
-            })
-        
-        st.markdown("""
-            <div style='color: #28a745; margin-top: 2rem;'>
-                <h3>🤖 Safety Agents Status</h3>
-            </div>
-        """, unsafe_allow_html=True)
-        st.session_state.agent_status.initialize_sidebar_placeholder()
-    
+        st.markdown("### 📞 Emergency Contacts")
+        for service, number in st.session_state.emergency_system.emergency_contacts.items():
+            st.markdown(f"""
+                <div class="emergency-contact">
+                    {service}: {number}
+                </div>
+            """, unsafe_allow_html=True)
+
     # Main chat interface
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            if isinstance(message["content"], dict):
-                st.markdown(f"""
-                    <div class="chat-message {message['role']}">
-                        {message['content']['final_analysis'].content}
-                    </div>
-                """, unsafe_allow_html=True)
-                
-                with st.expander("🔍 Detailed Safety Analysis", expanded=False):
-                    for agent_name, response in message['content'].items():
-                        if agent_name != 'final_analysis':
-                            st.markdown(f"""
-                                <div class="agent-card">
-                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                        <span style="font-size: 1.5rem;">
-                                            {get_agent_emoji(agent_name)}
-                                        </span>
-                                        <strong>{agent_name.replace('_', ' ').title()}</strong>
-                                    </div>
-                                    <div style="margin: 0.5rem 0;">
-                                        {response.content}
-                                    </div>
-                                    <div class="metadata-section">
-                                        <div>Confidence: {response.confidence:.2%}</div>
-                                        <div>Response Time: {response.processing_time:.2f}s</div>
-                                    </div>
-                                </div>
-                            """, unsafe_allow_html=True)
-            else:
-                st.markdown(f"""
-                    <div class="chat-message {message['role']}">
-                        {message['content']}
-                    </div>
-                """, unsafe_allow_html=True)
-    
-    # Chat input
-    if prompt := st.chat_input("Describe your emergency situation..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
+    if query := st.chat_input("Describe your emergency situation..."):
+        st.session_state.chat_history.append({"role": "user", "content": query})
         
-        with st.chat_message("user"):
-            st.markdown(prompt)
-        
-        with st.chat_message("assistant"):
-            response_placeholder = st.empty()
-            
+        with st.spinner("Analyzing emergency situation..."):
             try:
-                async def process_query():
-                    return await st.session_state.agent.process_query(
-                        prompt,
-                        st.session_state.agent_status.update_status
-                    )
+                response = asyncio.run(
+                    st.session_state.emergency_system.get_emergency_response(query)
+                )
                 
-                responses = asyncio.run(process_query())
+                # Display response
+                st.markdown("""
+                    <div class="response-card">
+                        <h3>🚨 Immediate Actions Required:</h3>
+                    </div>
+                """, unsafe_allow_html=True)
                 
-                if responses:
-                    response_placeholder.markdown(f"""
-                        <div class="chat-message assistant">
-                            {responses['final_analysis'].content}
+                for action in response.immediate_actions:
+                    st.markdown(f"""
+                        <div class="step-card">
+                            ✓ {action}
                         </div>
                     """, unsafe_allow_html=True)
-                    
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": responses
-                    })
+                
+                # Display other sections
+                sections = [
+                    ("📋 Detailed Steps", response.detailed_steps),
+                    ("⚠️ Important Precautions", response.precautions),
+                    ("🔄 Follow-up Care", response.followup_care)
+                ]
+                
+                for title, steps in sections:
+                    with st.expander(title):
+                        for step in steps:
+                            st.markdown(f"- {step}")
+                
+                # Update chat history
+                st.session_state.chat_history.append({
+                    "role": "assistant",
+                    "content": str(response)
+                })
                 
             except Exception as e:
-                response_placeholder.error(f"Error processing emergency response: {str(e)}")
-
-def get_agent_emoji(agent_name: str) -> str:
-    """Get appropriate emoji for each agent type"""
-    emoji_map = {
-        'medical_response': '🏥',
-        'personal_safety': '🛡️',
-        'disaster_response': '🌪️',
-        'women_safety': '👩',
-        'final_analysis': '🚨'
-    }
-    return emoji_map.get(agent_name, '🤖')
+                st.error(f"Error processing emergency response: {str(e)}")
 
 if __name__ == "__main__":
     main()
