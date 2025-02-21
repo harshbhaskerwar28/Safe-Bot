@@ -423,7 +423,7 @@ def main():
         
         st.markdown("""
             <div class='emergency-button'>
-                🚑 Emergency: Call 911
+                🚑 Emergency: Call 100,108
             </div>
             
             # Quick access buttons for common emergencies
