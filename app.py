@@ -56,7 +56,7 @@ class AgentStatus:
 
     def _render_agent_card(self, agent_name: str, status: dict):
         colors = {
-            'idle': '#6c757d',
+            'idle': '#28a745',
             'working': '#28a745',
             'completed': '#28a745',
             'error': '#dc3545'
