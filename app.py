@@ -12,6 +12,8 @@ import time
 
 load_dotenv()
 
+
+
 @dataclass
 class AgentResponse:
     """Structure for storing safety agent responses"""
@@ -22,14 +24,14 @@ class AgentResponse:
     processing_time: float = 0.0
 
 class AgentStatus:
-    """Safety agent status management with animated sidebar display"""
+    """Safety agent status management with sidebar display"""
     def __init__(self):
         self.sidebar_placeholder = None
         self.agents = {
-            'medical_response': {'status': 'idle', 'progress': 0, 'message': '', 'order': 0},
-            'personal_safety': {'status': 'idle', 'progress': 0, 'message': '', 'order': 1},
-            'disaster_response': {'status': 'idle', 'progress': 0, 'message': '', 'order': 2},
-            'women_safety': {'status': 'idle', 'progress': 0, 'message': '', 'order': 3}
+            'medical_response': {'status': 'idle', 'progress': 0, 'message': ''},
+            'personal_safety': {'status': 'idle', 'progress': 0, 'message': ''},
+            'disaster_response': {'status': 'idle', 'progress': 0, 'message': ''},
+            'women_safety': {'status': 'idle', 'progress': 0, 'message': ''}
         }
         
     def initialize_sidebar_placeholder(self):
@@ -40,8 +42,7 @@ class AgentStatus:
         self.agents[agent_name] = {
             'status': status,
             'progress': progress,
-            'message': message,
-            'order': self.agents[agent_name]['order']
+            'message': message
         }
         self._render_status()
 
@@ -50,59 +51,8 @@ class AgentStatus:
             self.initialize_sidebar_placeholder()
             
         with self.sidebar_placeholder.container():
-            self._render_flow_animation()
-            for agent_name, status in sorted(self.agents.items(), key=lambda x: x[1]['order']):
+            for agent_name, status in self.agents.items():
                 self._render_agent_card(agent_name, status)
-
-    def _render_flow_animation(self):
-        active_agents = [name for name, status in self.agents.items() if status['status'] == 'working']
-        if active_agents:
-            st.markdown("""
-                <div class="flow-animation">
-                    <div class="flow-line"></div>
-                    <div class="flow-particle"></div>
-                </div>
-                <style>
-                    .flow-animation {
-                        position: relative;
-                        height: 4px;
-                        margin: 1rem 0;
-                        background: rgba(40, 167, 69, 0.1);
-                        border-radius: 2px;
-                        overflow: hidden;
-                    }
-                    .flow-line {
-                        position: absolute;
-                        top: 0;
-                        left: 0;
-                        height: 100%;
-                        width: 100%;
-                        background: linear-gradient(90deg, 
-                            transparent 0%, 
-                            #28a745 50%, 
-                            transparent 100%
-                        );
-                        animation: flowLine 2s linear infinite;
-                    }
-                    .flow-particle {
-                        position: absolute;
-                        width: 8px;
-                        height: 8px;
-                        background: #28a745;
-                        border-radius: 50%;
-                        top: -2px;
-                        animation: flowParticle 3s linear infinite;
-                    }
-                    @keyframes flowLine {
-                        0% { transform: translateX(-100%); }
-                        100% { transform: translateX(100%); }
-                    }
-                    @keyframes flowParticle {
-                        0% { left: -10px; }
-                        100% { left: calc(100% + 10px); }
-                    }
-                </style>
-            """, unsafe_allow_html=True)
 
     def _render_agent_card(self, agent_name: str, status: dict):
         colors = {
@@ -113,91 +63,40 @@ class AgentStatus:
         }
         color = colors.get(status['status'], colors['idle'])
         
-        animation_class = 'agent-card-active' if status['status'] == 'working' else ''
-        pulse_animation = """
-            @keyframes pulseGlow {
-                0% { box-shadow: 0 0 5px %s; }
-                50% { box-shadow: 0 0 15px %s; }
-                100% { box-shadow: 0 0 5px %s; }
-            }
-            @keyframes slideIn {
-                from { transform: translateX(-100%%); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
-            }
-            .agent-card-active {
-                animation: pulseGlow 2s infinite, slideIn 0.5s ease-out;
-            }
-        """ % (color, color, color)
-        
         st.markdown(f"""
-            <style>
-                {pulse_animation}
-            </style>
-            <div class="agent-card {animation_class}" style="
+            <div style="
                 background-color: #1E1E1E;
                 padding: 0.8rem;
                 border-radius: 0.5rem;
                 margin-bottom: 0.8rem;
                 border: 1px solid {color};
-                transition: all 0.3s ease;
             ">
-                <div style="color: {color}; font-weight: bold; display: flex; align-items: center; gap: 0.5rem;">
-                    <span class="agent-icon">{get_agent_emoji(agent_name)}</span>
+                <div style="color: {color}; font-weight: bold;">
                     {agent_name.replace('_', ' ').title()}
                 </div>
                 <div style="
                     color: #FFFFFF;
                     font-size: 0.8rem;
                     margin: 0.3rem 0;
-                    opacity: {1 if status['status'] == 'working' else 0.7};
                 ">
                     {status['message'] or status['status'].title()}
                 </div>
-                <div class="progress-bar-container" style="
+                <div style="
                     height: 4px;
                     background-color: rgba(255,255,255,0.1);
                     border-radius: 2px;
                     margin-top: 0.5rem;
-                    overflow: hidden;
                 ">
-                    <div class="progress-bar" style="
+                    <div style="
                         width: {status['progress'] * 100}%;
                         height: 100%;
                         background-color: {color};
                         border-radius: 2px;
                         transition: width 0.3s ease;
-                        position: relative;
-                    ">
-                        {self._render_progress_animation(status) if status['status'] == 'working' else ''}
-                    </div>
+                    "></div>
                 </div>
             </div>
         """, unsafe_allow_html=True)
-
-    def _render_progress_animation(self, status):
-        return """
-            <div class="progress-pulse"></div>
-            <style>
-                @keyframes progressPulse {
-                    0% { transform: translateX(-100%); }
-                    100% { transform: translateX(100%); }
-                }
-                .progress-pulse {
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    background: linear-gradient(
-                        90deg,
-                        transparent 0%,
-                        rgba(255,255,255,0.3) 50%,
-                        transparent 100%
-                    );
-                    animation: progressPulse 1.5s linear infinite;
-                }
-            </style>
-        """
 
 class SafetyResponseSystem:
     """Emergency response system with specialized safety agents"""
@@ -587,69 +486,86 @@ def setup_streamlit_ui():
             border: 1px solid #28a745;
             background-color: rgba(40, 167, 69, 0.1);
             animation: fadeIn 0.5s ease-out;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .chat-message::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(
-                90deg,
-                transparent 0%,
-                rgba(40, 167, 69, 0.1) 50%,
-                transparent 100%
-            );
-            transform: translateX(-100%);
-            animation: shimmer 2s infinite;
-        }
-        
-        @keyframes shimmer {
-            100% { transform: translateX(100%); }
         }
         
         .agent-card {
-            transform-origin: center;
-            transition: transform 0.3s ease;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border: 1px solid #28a745;
+            border-radius: 0.5rem;
+            background-color: rgba(40, 167, 69, 0.05);
+            animation: fadeIn 0.5s ease-out;
         }
         
-        .agent-card:hover {
+        .metadata-section {
+            font-size: 0.8rem;
+            color: #28a745;
+            margin-top: 0.5rem;
+        }
+        
+        .emergency-button {
+            background-color: #dc3545;
+            color: white;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            text-align: center;
+            cursor: pointer;
+            margin: 1rem 0;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        
+        .emergency-button:hover {
+            background-color: #c82333;
             transform: scale(1.02);
         }
         
-        .agent-icon {
-            display: inline-block;
-            animation: bounce 1s infinite;
+        [data-testid="stSidebar"] {
+            background-color: #1a1a1a;
         }
         
-        @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-3px); }
+        .typing-animation {
+            overflow: hidden;
+            white-space: nowrap;
+            border-right: 2px solid #28a745;
+            animation: typing 3.5s steps(40, end),
+                       blink-caret 0.75s step-end infinite;
         }
         
-        .response-text {
-            opacity: 0;
-            animation: fadeInUp 0.5s forwards;
+        @keyframes blink-caret {
+            from, to { border-color: transparent }
+            50% { border-color: #28a745 }
         }
         
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+        .emergency-numbers {
+            background-color: rgba(220, 53, 69, 0.1);
+            border: 1px solid #dc3545;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin: 1rem 0;
         }
         
-        /* [Previous styles remain the same] */
+        .number-badge {
+            background-color: #28a745;
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.25rem;
+            margin-right: 0.5rem;
+            font-weight: bold;
+        }
+        
+        .expander-content {
+            background-color: rgba(40, 167, 69, 0.05);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-top: 0.5rem;
+        }
         </style>
     """, unsafe_allow_html=True)
+
 def main():
     setup_streamlit_ui()
     
