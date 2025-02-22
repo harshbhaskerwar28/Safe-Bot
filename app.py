@@ -727,46 +727,46 @@ def main():
         with st.chat_message("assistant"):
             response_placeholder = st.empty()
             
-             try:
-                response_placeholder = st.empty()
-                thinking_placeholder = st.empty()
-                
-                # Show thinking animation
-                thinking_placeholder.markdown("""
-                    <div class="thinking-animation">
-                        <div>Analyzing emergency situation...</div>
-                        <div class="dot"></div>
-                        <div class="dot"></div>
-                        <div class="dot"></div>
+         try:
+            response_placeholder = st.empty()
+            thinking_placeholder = st.empty()
+            
+            # Show thinking animation
+            thinking_placeholder.markdown("""
+                <div class="thinking-animation">
+                    <div>Analyzing emergency situation...</div>
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            async def process_query():
+                return await st.session_state.agent.process_query(
+                    prompt,
+                    st.session_state.agent_status.update_status
+                )
+            
+            responses = asyncio.run(process_query())
+            
+            # Remove thinking animation
+            thinking_placeholder.empty()
+            
+            if responses:
+                response_placeholder.markdown(f"""
+                    <div class="chat-message assistant">
+                        {responses['final_analysis'].content}
                     </div>
                 """, unsafe_allow_html=True)
                 
-                async def process_query():
-                    return await st.session_state.agent.process_query(
-                        prompt,
-                        st.session_state.agent_status.update_status
-                    )
-                
-                responses = asyncio.run(process_query())
-                
-                # Remove thinking animation
-                thinking_placeholder.empty()
-                
-                if responses:
-                    response_placeholder.markdown(f"""
-                        <div class="chat-message assistant">
-                            {responses['final_analysis'].content}
-                        </div>
-                    """, unsafe_allow_html=True)
-                    
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": responses
-                    })
-                
-            except Exception as e:
-                thinking_placeholder.empty()  # Clear thinking animation on error
-                response_placeholder.error(f"Error processing emergency response: {str(e)}")
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": responses
+                })
+            
+        except Exception as e:
+            thinking_placeholder.empty()  # Clear thinking animation on error
+            response_placeholder.error(f"Error processing emergency response: {str(e)}")
 
 def get_agent_emoji(agent_name: str) -> str:
     """Get appropriate emoji for each agent type"""
