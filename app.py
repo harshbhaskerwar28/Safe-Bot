@@ -547,6 +547,42 @@ def setup_streamlit_ui():
             border-radius: 0.5rem;
             margin: 1rem 0;
         }
+
+        .thinking-animation {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            background-color: rgba(40, 167, 69, 0.1);
+            border: 1px solid #28a745;
+            margin-bottom: 1rem;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            background-color: #28a745;
+            border-radius: 50%;
+            animation: bounce 1.5s infinite;
+        }
+        
+        .dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        
+        .dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        
+        @keyframes bounce {
+            0%, 60%, 100% {
+                transform: translateY(0);
+            }
+            30% {
+                transform: translateY(-10px);
+            }
+        }
         
         .number-badge {
             background-color: #28a745;
@@ -691,7 +727,20 @@ def main():
         with st.chat_message("assistant"):
             response_placeholder = st.empty()
             
-            try:
+             try:
+                response_placeholder = st.empty()
+                thinking_placeholder = st.empty()
+                
+                # Show thinking animation
+                thinking_placeholder.markdown("""
+                    <div class="thinking-animation">
+                        <div>Analyzing emergency situation...</div>
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                    </div>
+                """, unsafe_allow_html=True)
+                
                 async def process_query():
                     return await st.session_state.agent.process_query(
                         prompt,
@@ -699,6 +748,9 @@ def main():
                     )
                 
                 responses = asyncio.run(process_query())
+                
+                # Remove thinking animation
+                thinking_placeholder.empty()
                 
                 if responses:
                     response_placeholder.markdown(f"""
@@ -713,6 +765,7 @@ def main():
                     })
                 
             except Exception as e:
+                thinking_placeholder.empty()  # Clear thinking animation on error
                 response_placeholder.error(f"Error processing emergency response: {str(e)}")
 
 def get_agent_emoji(agent_name: str) -> str:
