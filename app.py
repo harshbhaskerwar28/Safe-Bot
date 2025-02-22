@@ -58,7 +58,7 @@ class AgentStatus:
         colors = {
             'idle': '#6c757d',
             'working': '#28a745',
-            'completed': '#17a2b8',
+            'completed': '#28a745',
             'error': '#dc3545'
         }
         color = colors.get(status['status'], colors['idle'])
