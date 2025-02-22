@@ -1,17 +1,3 @@
-import os
-import asyncio
-from dataclasses import dataclass
-from typing import Dict, List
-import streamlit as st
-from langchain_groq import ChatGroq
-from langchain.schema import AIMessage, HumanMessage
-from langchain.prompts import ChatPromptTemplate
-from langchain.schema.output_parser import StrOutputParser
-from dotenv import load_dotenv
-import time
-
-load_dotenv()
-
 @dataclass
 class AgentResponse:
     """Structure for storing safety agent responses"""
@@ -22,6 +8,7 @@ class AgentResponse:
     processing_time: float = 0.0
 
 class AgentStatus:
+    """Safety agent status management with sidebar display"""
     def __init__(self):
         self.sidebar_placeholder = None
         self.agents = {
@@ -54,32 +41,19 @@ class AgentStatus:
     def _render_agent_card(self, agent_name: str, status: dict):
         colors = {
             'idle': '#6c757d',
-            'working': '#ffd700',  # Yellow while working
-            'completed': '#28a745',  # Green when completed
+            'working': '#28a745',
+            'completed': '#17a2b8',
             'error': '#dc3545'
         }
         color = colors.get(status['status'], colors['idle'])
         
-        animation_css = """
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.02); }
-            100% { transform: scale(1); }
-        }
-        """
-        
-        animation_style = "animation: pulse 2s infinite;" if status['status'] == 'working' else ""
-        
         st.markdown(f"""
-            <style>{animation_css}</style>
             <div style="
                 background-color: #1E1E1E;
                 padding: 0.8rem;
                 border-radius: 0.5rem;
                 margin-bottom: 0.8rem;
                 border: 1px solid {color};
-                {animation_style}
-                transition: all 0.3s ease;
             ">
                 <div style="color: {color}; font-weight: bold;">
                     {agent_name.replace('_', ' ').title()}
@@ -109,10 +83,11 @@ class AgentStatus:
         """, unsafe_allow_html=True)
 
 class SafetyResponseSystem:
+    """Emergency response system with specialized safety agents"""
     def __init__(self):
         self.llm = ChatGroq(
-            temperature=0.3,
-            model_name="llama-guard-3-8b",
+            temperature=0.7,  # Increased for more creative responses
+            model_name="mixtral-8x7b-32768",  # Using a more capable model
             groq_api_key=os.getenv("GROQ_API_KEY")
         )
         self.chat_history = []
@@ -120,115 +95,84 @@ class SafetyResponseSystem:
         self.agents = self._initialize_agents()
 
     def _initialize_prompts(self):
+        """Initialize specialized safety agent prompts"""
+        base_prompt = """You are an expert emergency response system. Your role is to provide detailed, practical guidance for emergency situations.
+
+USER QUERY: {query}
+CHAT HISTORY: {chat_history}
+
+Analyze the situation carefully and provide comprehensive guidance following this structure:
+
+1. SITUATION ASSESSMENT
+- Analyze the specific emergency details
+- Identify immediate risks and threats
+- Determine priority actions
+
+2. IMMEDIATE ACTIONS
+- List specific step-by-step instructions
+- Include exact timing for each step
+- Specify who should take what action
+
+3. SAFETY MEASURES
+- Detail specific safety protocols
+- List required safety equipment
+- Provide environmental safety tips
+
+4. EMERGENCY CONTACTS
+- List relevant emergency numbers
+- Specify when to contact each service
+- Include backup contact options
+
+5. FOLLOW-UP STEPS
+- Provide post-emergency guidance
+- List monitoring requirements
+- Specify recovery actions
+
+FORMAT YOUR RESPONSE:
+• Use clear, specific language
+• Include exact measurements and timing
+• Provide specific examples
+• Reference actual emergency protocols
+• Include relevant medical/safety terms
+
+Remember: Your guidance could save lives. Be thorough and precise."""
+
         self.prompts = {
-            'medical_response': """You are an Indian Emergency Medical Response AI assistant.
-Query: {query}
-Chat History: {chat_history}
+            'medical_response': base_prompt + """
 
-Provide detailed step-by-step medical guidance for India:
+For medical emergencies:
+- Use standard medical protocols
+- Reference specific first aid procedures
+- Include vital signs monitoring
+- Specify medication considerations
+- Detail infection control measures""",
 
-1. IMMEDIATE ACTIONS:
-   - Specific first-aid steps
-   - Critical do's and don'ts
-   
-2. EMERGENCY CONTACTS:
-   - When to call 102 (Ambulance)
-   - When to call 108 (Emergency)
-   - Local hospital contact information
-   
-3. MEDICAL ASSISTANCE:
-   - Signs requiring immediate professional help
-   - Important medical information to share
-   
-4. FOLLOW-UP CARE:
-   - Post-emergency care steps
-   - Medical documentation needed
-   
-Focus on practical, life-saving steps appropriate for Indian healthcare context.""",
+            'personal_safety': base_prompt + """
 
-            'personal_safety': """You are an Indian Personal Safety Response AI assistant.
-Query: {query}
-Chat History: {chat_history}
+For personal safety:
+- Include de-escalation techniques
+- Detail self-defense options
+- Specify escape routes planning
+- Include surveillance awareness
+- Detail communication protocols""",
 
-Provide specific safety guidance for Indian context:
+            'disaster_response': base_prompt + """
 
-1. IMMEDIATE SAFETY:
-   - Location-specific safety steps
-   - Contact emergency number 112
-   - Local police station contact
-   
-2. PROTECTION MEASURES:
-   - Practical defense strategies
-   - Safe zones identification
-   - Community support access
-   
-3. EMERGENCY RESOURCES:
-   - Local authorities contact
-   - Support organizations
-   - Documentation needed
-   
-4. PREVENTIVE STEPS:
-   - Future safety measures
-   - Alert systems setup
-   - Emergency planning
+For disaster response:
+- Include evacuation protocols
+- Detail shelter requirements
+- Specify resource management
+- Include weather considerations
+- Detail communication plans""",
 
-Keep instructions practical and specific to Indian environment.""",
+            'women_safety': base_prompt + """
 
-            'disaster_response': """You are an Indian Disaster Response AI assistant.
-Query: {query}
-Chat History: {chat_history}
-
-Provide India-specific disaster response guidance:
-
-1. IMMEDIATE ACTIONS:
-   - Location-based safety steps
-   - Evacuation procedures
-   - Emergency kit essentials
-   
-2. EMERGENCY CONTACTS:
-   - NDRF helpline (1078)
-   - State disaster management
-   - Local emergency services
-   
-3. DISASTER PROTOCOLS:
-   - Area-specific guidelines
-   - Communication methods
-   - Resource management
-   
-4. RECOVERY STEPS:
-   - Post-disaster safety
-   - Government assistance
-   - Documentation needed
-
-Focus on practical steps relevant to Indian disaster response systems.""",
-
-            'women_safety': """You are an Indian Women's Safety Response AI assistant.
-Query: {query}
-Chat History: {chat_history}
-
-Provide focused safety guidance for Indian women:
-
-1. IMMEDIATE SAFETY:
-   - Women's helpline (1091)
-   - Police helpline (112)
-   - Immediate protection steps
-   
-2. SUPPORT RESOURCES:
-   - Local women's organizations
-   - Legal aid services
-   - Safe shelter locations
-   
-3. LEGAL RIGHTS:
-   - Indian legal protections
-   - Documentation needed
-   - Reporting procedures
-   
-4. SAFETY STRATEGIES:
-   - Practical protection methods
-   - Emergency alert setup
-   - Support network building
-
-Maintain sensitivity while providing practical, India-specific guidance."""
+For women's safety:
+- Include specific defense strategies
+- Detail support network activation
+- Specify legal protection steps
+- Include documentation guidance
+- Detail recovery resources"""
         }
 
     def _initialize_agents(self):
@@ -256,8 +200,11 @@ Maintain sensitivity while providing practical, India-specific guidance."""
         chat_history = self._format_chat_history()
         
         try:
+            # Determine relevant agents based on query content
+            relevant_agents = self._select_relevant_agents(query)
+            
             agent_tasks = []
-            for agent_name in self.agents.keys():
+            for agent_name in relevant_agents:
                 status_callback(agent_name, 'working', 0.2, f"Analyzing situation")
                 agent_tasks.append(self._get_agent_response(
                     agent_name, query, chat_history
@@ -265,7 +212,7 @@ Maintain sensitivity while providing practical, India-specific guidance."""
 
             agent_responses = await asyncio.gather(*agent_tasks)
             
-            for agent_name, response in zip(self.agents.keys(), agent_responses):
+            for agent_name, response in zip(relevant_agents, agent_responses):
                 responses[agent_name] = response
                 status_callback(
                     agent_name,
@@ -289,7 +236,34 @@ Maintain sensitivity while providing practical, India-specific guidance."""
         except Exception as e:
             for agent in self.agents.keys():
                 status_callback(agent, 'error', 0, str(e))
-            raise Exception(f"Analysis error: {str(e)}")
+            raise Exception(f"Safety analysis error: {str(e)}")
+
+    def _select_relevant_agents(self, query: str) -> List[str]:
+        """Select relevant agents based on query content"""
+        query = query.lower()
+        selected_agents = []
+        
+        # Medical keywords
+        if any(word in query for word in ['medical', 'health', 'hurt', 'pain', 'injury', 'sick', 'blood', 'breathing', 'heart']):
+            selected_agents.append('medical_response')
+            
+        # Personal safety keywords
+        if any(word in query for word in ['safety', 'threat', 'danger', 'scared', 'attack', 'follow', 'suspicious']):
+            selected_agents.append('personal_safety')
+            
+        # Disaster keywords
+        if any(word in query for word in ['disaster', 'flood', 'fire', 'earthquake', 'storm', 'hurricane', 'evacuation']):
+            selected_agents.append('disaster_response')
+            
+        # Women's safety keywords
+        if any(word in query for word in ['woman', 'women', 'girl', 'harassment', 'stalking', 'assault']):
+            selected_agents.append('women_safety')
+            
+        # If no specific category is detected, use all agents
+        if not selected_agents:
+            selected_agents = list(self.agents.keys())
+            
+        return selected_agents
 
     async def _get_agent_response(
         self,
@@ -323,22 +297,49 @@ Maintain sensitivity while providing practical, India-specific guidance."""
             )
             
         except Exception as e:
-            raise Exception(f"Agent {agent_name} error: {str(e)}")
+            raise Exception(f"Safety agent {agent_name} error: {str(e)}")
 
     def _calculate_confidence(self, response: str) -> float:
-        confidence = 0.7
+        """Calculate response confidence based on content analysis"""
+        base_confidence = 0.7
         
-        key_indicators = [
-            "immediately", "urgent", "emergency",
-            "call 112", "call 108", "call 102",
-            "seek help", "safety", "caution", "warning"
-        ]
+        # Key phrases that indicate high-quality response
+        quality_indicators = {
+            "critical": 0.05,
+            "immediate": 0.05,
+            "emergency": 0.04,
+            "warning": 0.04,
+            "step": 0.03,
+            "safety": 0.03,
+            "contact": 0.03,
+            "call": 0.03
+        }
         
-        for indicator in key_indicators:
-            if indicator.lower() in response.lower():
-                confidence += 0.03
+        # Structure indicators
+        structure_indicators = {
+            "1.": 0.05,
+            "2.": 0.05,
+            "3.": 0.05,
+            "4.": 0.05
+        }
+        
+        confidence = base_confidence
+        
+        # Check for quality phrases
+        for phrase, weight in quality_indicators.items():
+            if phrase.lower() in response.lower():
+                confidence += weight
                 
-        return min(0.95, confidence)
+        # Check for proper structure
+        for marker, weight in structure_indicators.items():
+            if marker in response:
+                confidence += weight
+                
+        # Penalize very short responses
+        if len(response) < 100:
+            confidence -= 0.2
+        
+        return min(0.95, max(0.3, confidence))
 
     async def _synthesize_safety_responses(
         self,
@@ -351,7 +352,23 @@ Maintain sensitivity while providing practical, India-specific guidance."""
             if query.lower().strip() in greetings:
                 return AgentResponse(
                     agent_name="final_analysis",
-                    content="Namaste! I'm your Indian Emergency Response Assistant. I can help you with medical emergencies, personal safety, disaster response, and women's safety. How may I assist you?",
+                    content="""Welcome to the Emergency Safety Response System. I'm here to provide immediate guidance for any emergency situation. How can I help you today?
+
+Please describe your situation in detail, including:
+- The type of emergency you're facing
+- Your current location and environment
+- Any immediate risks or threats
+- Available resources or help nearby
+- Any medical conditions or special circumstances
+
+I can assist with:
+- Medical emergencies and first aid guidance
+- Personal safety in threatening situations
+- Natural disaster response and preparation
+- Women's safety and support
+- General emergency guidance
+
+The more details you provide, the more specific and helpful my guidance will be.""",
                     confidence=1.0,
                     metadata={"greeting": True},
                     processing_time=0.1
@@ -365,35 +382,28 @@ Maintain sensitivity while providing practical, India-specific guidance."""
 
             start_time = time.time()
             
-            synthesis_template = """
-            Analyze these safety recommendations and provide India-specific guidance:
+            synthesis_template = """You are the Emergency Response Coordinator synthesizing expert analyses into actionable guidance.
 
-            1. IMMEDIATE ACTIONS:
-               - Critical first steps
-               - Emergency numbers to call
-               - Local authority contact
-            
-            2. DETAILED STEPS:
-               - Step-by-step instructions
-               - Important precautions
-               - Resource requirements
-            
-            3. PROFESSIONAL HELP:
-               - When to seek emergency services
-               - Required documentation
-               - Contact information
-            
-            4. FOLLOW-UP ACTIONS:
-               - Post-emergency steps
-               - Documentation needs
-               - Support resources
+EMERGENCY QUERY: {query}
 
-            Safety Assessments:
-            {formatted_responses}
-            
-            Provide clear, actionable steps focused on Indian emergency response systems.
-            Always include relevant emergency numbers (112, 108, 102, 1091, 1078).
-            """
+EXPERT ANALYSES:
+{formatted_responses}
+
+Create a comprehensive response that:
+1. Addresses the specific emergency situation
+2. Provides clear, actionable steps
+3. Includes relevant safety measures
+4. Lists specific emergency contacts
+5. Details follow-up actions
+
+FORMAT:
+• Start with most critical actions
+• Use clear, specific language
+• Include exact timings and measurements
+• Reference proper procedures and protocols
+• Maintain a calm, authoritative tone
+
+Remember: This is a real emergency situation requiring detailed, accurate guidance."""
 
             synthesis_prompt = ChatPromptTemplate.from_messages([
                 ("system", synthesis_template)
@@ -402,6 +412,7 @@ Maintain sensitivity while providing practical, India-specific guidance."""
             synthesis_chain = synthesis_prompt | self.llm | StrOutputParser()
             
             synthesis_response = await synthesis_chain.ainvoke({
+                "query": query,
                 "formatted_responses": formatted_responses
             })
             
@@ -426,7 +437,7 @@ Maintain sensitivity while providing practical, India-specific guidance."""
             )
 
         except Exception as e:
-            raise Exception(f"Synthesis error: {str(e)}")
+            raise Exception(f"Safety synthesis error: {str(e)}")
 
 def setup_streamlit_ui():
     st.set_page_config(
